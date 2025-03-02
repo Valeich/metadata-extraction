@@ -31,9 +31,6 @@ def extract_metadata_from_base64(encoded_pdf: str):
         logger.error(f"Error processing PDF metadata: {e}")
         return {"error": f"Error reading PDF metadata: {e}"}
 
-async def async_generate(client, model, contents, config):
-    return await client.models.generate_content(model=model, contents=contents, config=config)
-
 def generate_extraction_from_base64(encoded_pdf: str):
     """Uses Google Gen AI to extract structured data from a base64-encoded PDF."""
     try:
@@ -76,10 +73,23 @@ def generate_extraction_from_base64(encoded_pdf: str):
             system_instruction=system_instruction,
         )
 
-        # FIX: Create and use a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        response = loop.run_until_complete(async_generate(client, model, contents, generate_content_config))
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            response = asyncio.run_coroutine_threadsafe(
+                client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=generate_content_config,
+                ), loop
+            ).result()
+        else:
+            response = loop.run_until_complete(
+                client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=generate_content_config,
+                )
+            )
         
         try:
             extraction_result = json.loads(response.text)
