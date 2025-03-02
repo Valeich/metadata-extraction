@@ -57,8 +57,12 @@ def generate_extraction_from_base64(encoded_pdf: str):
             text="Generate JSON output with only the parsed content."
         )
         system_instruction = (
-            """I will give you PDF and Image files. The files contain an official document with information
-            about a civil servant. Extract the details in JSON format."""
+            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as civil servant. I need you to parse the civil person's information into JSON in the array format: 
+      {"name": "", "nip": "", "place_of_birth": "", "date_of_birth": "", "education": "", "title": "", "work_duration": "", "work_unit": "", "gov_instance": "", "signer": "", "signer_employee_id": "", "copied": ""}
+
+      Detect if the document is photocopied by scanning all of the pages in the document, grayscale is a sign that the document is copied and return with yes or no.
+      Do NOT add any other attributes.
+      Do not hallucinate, if you cannot parse the text from the document respond with null. If the extraction process succesfull return with status code 200, otherwise return with status code 400"""
         )
 
         model = "gemini-2.0-flash-exp"
@@ -72,7 +76,10 @@ def generate_extraction_from_base64(encoded_pdf: str):
             system_instruction=system_instruction,
         )
 
-        response = asyncio.run(async_generate(client, model, contents, generate_content_config))
+        # FIX: Create and use a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        response = loop.run_until_complete(async_generate(client, model, contents, generate_content_config))
         
         try:
             extraction_result = json.loads(response.text)
