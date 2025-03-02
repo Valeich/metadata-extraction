@@ -4,6 +4,7 @@ import io
 import os
 import logging
 import json
+import asyncio
 from flask import Flask, request, jsonify
 from google import genai
 from google.genai import types
@@ -30,6 +31,9 @@ def extract_metadata_from_base64(encoded_pdf: str):
         logger.error(f"Error processing PDF metadata: {e}")
         return {"error": f"Error reading PDF metadata: {e}"}
 
+async def async_generate(client, model, contents, config):
+    return await client.models.generate_content(model=model, contents=contents, config=config)
+
 def generate_extraction_from_base64(encoded_pdf: str):
     """Uses Google Gen AI to extract structured data from a base64-encoded PDF."""
     try:
@@ -53,38 +57,22 @@ def generate_extraction_from_base64(encoded_pdf: str):
             text="Generate JSON output with only the parsed content."
         )
         system_instruction = (
-            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as a civil servant. I need you to parse the civil person's information into JSON in the array format:
-            [{"name": "", "nip": "", "place_of_birth": "", "date_of_birth": "", "education": "", "title": "", "work_duration": "", "work_unit": "", "gov_instance": "", "signer": "", "signer_employee_id": "", "copied": ""}]
-            
-            Detect if the document is photocopied by scanning all of the pages in the document. If grayscale is detected, return 'yes', otherwise 'no'.
-            Do NOT add any other attributes.
-            If you cannot parse the text from the document, respond with null.
-            If the extraction process is successful, return with status code 200, otherwise return with status code 400."""
+            """I will give you PDF and Image files. The files contain an official document with information
+            about a civil servant. Extract the details in JSON format."""
         )
 
         model = "gemini-2.0-flash-exp"
-        contents = [
-            types.Content(role="user", parts=[part, text_part])
-        ]
+        contents = [types.Content(role="user", parts=[part, text_part])]
+
         generate_content_config = types.GenerateContentConfig(
             temperature=0.1,
             top_p=0.95,
             max_output_tokens=8192,
             response_modalities=["TEXT"],
-            safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
-            ],
             system_instruction=system_instruction,
         )
 
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=generate_content_config,
-        )
+        response = asyncio.run(async_generate(client, model, contents, generate_content_config))
         
         try:
             extraction_result = json.loads(response.text)
