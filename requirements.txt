@@ -2,3 +2,4 @@ Flask
 pypdf
 gunicorn
 google-genai
+asyncio
