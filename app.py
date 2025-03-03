@@ -8,8 +8,6 @@ import asyncio
 from flask import Flask, request, jsonify
 from google import genai
 from google.genai import types
-from asgiref.wsgi import WsgiToAsgi
-import uvicorn
 
 # Configure logging
 logging.basicConfig(
@@ -19,7 +17,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-asgi_app = WsgiToAsgi(app)
 
 def extract_metadata_from_base64(encoded_pdf: str):
     """Extracts metadata from a base64-encoded PDF."""
@@ -28,20 +25,20 @@ def extract_metadata_from_base64(encoded_pdf: str):
         pdf_stream = io.BytesIO(pdf_bytes)
         reader = pypdf.PdfReader(pdf_stream)
         metadata = reader.metadata
-        
+
         return {"metadata": {k: str(v) for k, v in metadata.items()} if metadata else "No metadata found"}
     except Exception as e:
         logger.error(f"Error processing PDF metadata: {e}")
         return {"error": f"Error reading PDF metadata: {e}"}
 
-async def async_generate_extraction_from_base64(encoded_pdf: str):
+def generate_extraction_from_base64(encoded_pdf: str):
     """Uses Google Gen AI to extract structured data from a base64-encoded PDF."""
     try:
         pdf_bytes = base64.b64decode(encoded_pdf)
     except Exception as e:
         logger.error(f"Base64 decoding error: {e}")
         return {"error": f"Invalid base64 encoding: {e}"}
-    
+
     try:
         client = genai.Client(
             vertexai=True,
@@ -57,12 +54,12 @@ async def async_generate_extraction_from_base64(encoded_pdf: str):
             text="Generate JSON output with only the parsed content."
         )
         system_instruction = (
-            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as civil servant. I need you to parse the civil person's information into JSON in the array format:
+            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as a civil servant. I need you to parse the civil person's information into JSON in the array format:
             {"name": "", "nip": "", "place_of_birth": "", "date_of_birth": "", "education": "", "title": "", "work_duration": "", "work_unit": "", "gov_instance": "", "signer": "", "signer_employee_id": "", "copied": ""}
 
             Detect if the document is photocopied by scanning all of the pages in the document, grayscale is a sign that the document is copied and return with yes or no.
             Do NOT add any other attributes.
-            Do not hallucinate, if you cannot parse the text from the document respond with null. If the extraction process succesfull return with status code 200, otherwise return with status code 400"""
+            Do not hallucinate, if you cannot parse the text from the document respond with null. If the extraction process is successful return with status code 200, otherwise return with status code 400"""
         )
 
         model = "gemini-2.0-flash-exp"
@@ -76,17 +73,17 @@ async def async_generate_extraction_from_base64(encoded_pdf: str):
             system_instruction=system_instruction,
         )
 
-        response = await client.models.generate_content(
+        response = client.models.generate_content(
             model=model,
             contents=contents,
             config=generate_content_config,
         )
-        
+
         try:
             extraction_result = json.loads(response.text)
         except json.JSONDecodeError:
             extraction_result = {"error": "Could not parse AI response"}
-        
+
         return extraction_result
     except Exception as e:
         logger.error(f"Error processing AI extraction: {e}")
@@ -108,7 +105,7 @@ def metadata_endpoint():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/extract', methods=['POST'])
-async def extract_endpoint():
+def extract_endpoint():
     """API endpoint to extract data from a PDF using Google Gen AI."""
     try:
         data = request.get_json()
@@ -116,7 +113,7 @@ async def extract_endpoint():
             return jsonify({"error": "Missing 'base64_pdf' in request"}), 400
 
         base64_pdf = data["base64_pdf"]
-        extraction_result = await async_generate_extraction_from_base64(base64_pdf)
+        extraction_result = generate_extraction_from_base64(base64_pdf)
         return jsonify(extraction_result), 200
     except Exception as e:
         logger.error(f"Error processing /extract: {e}")
@@ -129,4 +126,4 @@ def health_check():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
     logger.info(f"Starting application on port {port}")
-    uvicorn.run(asgi_app, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port)
