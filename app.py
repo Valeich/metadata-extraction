@@ -74,6 +74,20 @@ def generate_extraction_from_base64(encoded_pdf: str):
         logger.error(f"Error processing AI extraction: {e}")
         return {"error": f"Error processing AI extraction: {e}"}
 
+@app.route('/metadata', methods=['POST'])
+def metadata_endpoint():
+    """API endpoint to extract metadata from a PDF."""
+    try:
+        data = request.get_json()
+        if not data or "base64_pdf" not in data:
+            return jsonify({"error": "Missing 'base64_pdf' in request"}), 400
+
+        metadata_result = extract_metadata_from_base64(data["base64_pdf"])
+        return jsonify(metadata_result), 200
+    except Exception as e:
+        logger.error(f"Error processing /metadata: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/extract', methods=['POST'])
 def extract_endpoint():
     """API endpoint to extract data from a PDF using Google Gen AI."""
