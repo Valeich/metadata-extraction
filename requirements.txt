@@ -2,5 +2,5 @@ Flask
 uvicorn
 gunicorn
 pypdf
-google-genai
+google-generativeai
 asgiref
