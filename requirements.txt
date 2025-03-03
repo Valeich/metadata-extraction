@@ -1,5 +1,6 @@
 Flask
-pypdf
+uvicorn
 gunicorn
+pypdf
 google-genai
-asyncio
+asgiref
