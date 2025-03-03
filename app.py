@@ -4,10 +4,10 @@ import io
 import os
 import logging
 import json
-import asyncio
 from flask import Flask, request, jsonify
 from google import genai
 from google.genai import types
+import uvicorn
 
 # Configure logging
 logging.basicConfig(
@@ -25,7 +25,7 @@ def extract_metadata_from_base64(encoded_pdf: str):
         pdf_stream = io.BytesIO(pdf_bytes)
         reader = pypdf.PdfReader(pdf_stream)
         metadata = reader.metadata
-
+        
         return {"metadata": {k: str(v) for k, v in metadata.items()} if metadata else "No metadata found"}
     except Exception as e:
         logger.error(f"Error processing PDF metadata: {e}")
@@ -38,7 +38,7 @@ def generate_extraction_from_base64(encoded_pdf: str):
     except Exception as e:
         logger.error(f"Base64 decoding error: {e}")
         return {"error": f"Invalid base64 encoding: {e}"}
-
+    
     try:
         client = genai.Client(
             vertexai=True,
@@ -78,12 +78,12 @@ def generate_extraction_from_base64(encoded_pdf: str):
             contents=contents,
             config=generate_content_config,
         )
-
+        
         try:
             extraction_result = json.loads(response.text)
         except json.JSONDecodeError:
             extraction_result = {"error": "Could not parse AI response"}
-
+        
         return extraction_result
     except Exception as e:
         logger.error(f"Error processing AI extraction: {e}")
