@@ -54,12 +54,12 @@ def generate_extraction_from_base64(encoded_pdf: str):
             text="Generate JSON output with only the parsed content."
         )
         system_instruction = (
-            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as civil servant. I need you to parse the civil person's information into JSON in the array format: 
-      {"name": "", "nip": "", "place_of_birth": "", "date_of_birth": "", "education": "", "title": "", "work_duration": "", "work_unit": "", "gov_instance": "", "signer": "", "signer_employee_id": "", "copied": ""}
+            """I will give you PDF and Image files. The files are an official document that has the document number, the guidelines, and the details of a person to be hired as civil servant. I need you to parse the civil person's information into JSON in the array format:
+            {"name": "", "nip": "", "place_of_birth": "", "date_of_birth": "", "education": "", "title": "", "work_duration": "", "work_unit": "", "gov_instance": "", "signer": "", "signer_employee_id": "", "copied": ""}
 
-      Detect if the document is photocopied by scanning all of the pages in the document, grayscale is a sign that the document is copied and return with yes or no.
-      Do NOT add any other attributes.
-      Do not hallucinate, if you cannot parse the text from the document respond with null. If the extraction process succesfull return with status code 200, otherwise return with status code 400"""
+            Detect if the document is photocopied by scanning all of the pages in the document, grayscale is a sign that the document is copied and return with yes or no.
+            Do NOT add any other attributes.
+            Do not hallucinate, if you cannot parse the text from the document respond with null. If the extraction process succesfull return with status code 200, otherwise return with status code 400"""
         )
 
         model = "gemini-2.0-flash-exp"
@@ -101,23 +101,34 @@ def generate_extraction_from_base64(encoded_pdf: str):
         logger.error(f"Error processing AI extraction: {e}")
         return {"error": f"Error processing AI extraction: {e}"}
 
-@app.route('/process-pdf', methods=['POST'])
-def process_pdf():
-    """API endpoint to process PDF: extracts metadata and AI-generated structured data."""
+@app.route('/metadata', methods=['POST'])
+def metadata_endpoint():
+    """API endpoint to extract metadata from a PDF."""
     try:
         data = request.get_json()
         if not data or "base64_pdf" not in data:
             return jsonify({"error": "Missing 'base64_pdf' in request"}), 400
 
         base64_pdf = data["base64_pdf"]
-        response_data = {}
-
-        response_data["metadata"] = extract_metadata_from_base64(base64_pdf)
-        response_data["extraction_result"] = generate_extraction_from_base64(base64_pdf)
-
-        return jsonify(response_data), 200
+        metadata_result = extract_metadata_from_base64(base64_pdf)
+        return jsonify(metadata_result), 200
     except Exception as e:
-        logger.error(f"Error processing /process-pdf: {e}")
+        logger.error(f"Error processing /metadata: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/extract', methods=['POST'])
+def extract_endpoint():
+    """API endpoint to extract data from a PDF using Google Gen AI."""
+    try:
+        data = request.get_json()
+        if not data or "base64_pdf" not in data:
+            return jsonify({"error": "Missing 'base64_pdf' in request"}), 400
+
+        base64_pdf = data["base64_pdf"]
+        extraction_result = generate_extraction_from_base64(base64_pdf)
+        return jsonify(extraction_result), 200
+    except Exception as e:
+        logger.error(f"Error processing /extract: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
