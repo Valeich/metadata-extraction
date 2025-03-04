@@ -5,9 +5,9 @@ import os
 import logging
 import json
 from flask import Flask, request, jsonify
-from flask_cors import CORS  # Added for CORS support
-from google import genai
-from google.genai import types
+from flask_cors import CORS 
+from google.cloud import genai
+from google.cloud.genai import types
 
 # Configure logging
 logging.basicConfig(
@@ -43,6 +43,7 @@ def generate_extraction_from_base64(encoded_pdf: str):
     try:
         # Ensure proper credentials are set via the environment (GOOGLE_APPLICATION_CREDENTIALS)
         client = genai.GenerativeModel("gemini-2.0-flash-exp")
+        # Wrap the PDF bytes in a Part object specifying its MIME type
         part = types.Part.from_bytes(bytes=pdf_bytes, mime_type="application/pdf")
         text_part = types.Part.from_text(text="Generate JSON output with only the parsed content.")
 
@@ -109,7 +110,7 @@ def health_check():
     return jsonify({"status": "running"}), 200
 
 if __name__ == '__main__':
-    # Cloud Run provides the PORT environment variable
+    # Cloud Run provides the PORT environment variable.
     port = int(os.environ.get('PORT', 8080))
     logger.info(f"Starting application on port {port}")
     app.run(host='0.0.0.0', port=port)
